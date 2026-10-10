@@ -80,6 +80,27 @@ class ToolPath:
         diameter = 2 * radius
         return cls.ellipse(centre, diameter, diameter, speed)
         
-class LayeredToolPath
+class LayeredToolPath:
+    def __init__(self, base_path: ToolPath, layer_height: float, num_layers: int):
+        if not type(num_layers) == int:
+            raise ValueError("Number of layers must be an integer")
 
-    
+        if layer_height <= 0 or num_layers <= 0:
+            raise ValueError("Layer height and number of layers must be positive")
+
+        self.base_path = base_path
+        self.layer_height = layer_height
+        self.num_layers = num_layers
+
+    def layer_z(self, layer_no: int):
+        if layer_no < 0 or layer_no > self.num_layers + 1:
+            raise ValueError("Layer number out of range")
+        
+        return self.layer_height * layer_no
+
+    def layers(self):
+        layers_heights = []
+        for i in range(self.num_layers):
+            layers_heights.append((self.layer_z(i), self.base_path.points.copy()))
+
+        return layers_heights
