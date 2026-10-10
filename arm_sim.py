@@ -3,8 +3,9 @@ import numpy as np
 from matplotlib.widgets import Slider
 import time
 
-#This is 3rd draft and the animation is determine by 2nd armvisualiser class, done purely through matplotlib
-#the jacobian is derived and used for the animation for smoothness, (damped least squares)
+#This is 4th draft, animation done purely through matplotlib
+#the jacobian was discarded due to it's inability to pathfind caused by using a straight lined path to target coordinates
+#used a different version of the inital interpolation by changing IK
 
 g = 9.81
 
@@ -66,8 +67,21 @@ class TwoLinkArm:
         gamma = elbow_vertex_angle
         alpha = origin_vertex_angle
 
-        self.theta1 = np.degrees(thetaT - alpha)
-        self.theta2 = np.degrees(np.pi - gamma)
+        #elbow down as well as elbow up solution
+        theta1_a = np.degrees(thetaT - alpha)
+        theta2_a = np.degrees(np.pi - gamma)
+        #elbow up
+        theta1_b = np.degrees(thetaT + alpha)
+        theta2_b = -np.degrees(np.pi - gamma)
+
+        #validity test that picks the 2 solutions
+        if self.is_config_valid(theta1_a, theta2_a):
+            self.theta1, self.theta2 = theta1_a, theta2_a
+        elif self.is_config_valid(theta1_b, theta2_b):
+            self.theta1, self.theta2 = theta1_b, theta2_b
+        else:
+            raise ValueError(f"No valid elbow configuration reaches ({x_target}, {y_target}) without violating the ground constraint")
+
 
     def jacobian(self, theta1: float, theta2: float):
         theta1 = np.radians(theta1)
@@ -113,12 +127,8 @@ class ArmVisualiser:
             theta2 = self.slider2.val
 
             if not self.robot.is_config_valid(theta1, theta2):
-                self.slider1.eventson = False
-                self.slider2.eventson = False
                 self.slider1.set_val(self.last_theta1)
                 self.slider2.set_val(self.last_theta2)
-                self.slider1.eventson = True
-                self.slider2.eventson = True
                 return
 
             self.robot.forward_kinematics(theta1, theta2)
@@ -152,43 +162,26 @@ class ArmVisualiser:
         ax.set_xlim(-reach - 0.5, reach + 0.5)
         ax.set_ylim(0, reach + 0.5)
         ax.set_aspect("equal")
-        plt.grid(True)
-        plt.gca().set_aspect('equal', adjustable='box')
 
         self.slider1.on_changed(update)
         self.slider2.on_changed(update)
         
         plt.show(block=False)
 
-    def animate_path(self, points: list, gain: float = 16, dt: float = 0.01):
+    def animate_path(self, points: list, pause: float = 0.5, steps: int = 20):
         for x, y in points:
-            target_not_reached = True
-            while target_not_reached:
-                current_theta1 = self.slider1.val #degrees
-                current_theta2 = self.slider2.val
-                current_x, current_y = self.robot.end_effector
+            self.robot.inverse_kinematics(x, y)
+            t1_target, t2_target = self.robot.theta1, self.robot.theta2
+            t1_start, t2_start = self.slider1.val, self.slider2.val
 
-                dx = x - current_x
-                dy = y - current_y
-                distance = np.sqrt(dx**2 + dy**2)
-                vx = dx * gain
-                vy = dy * gain
-
-                if distance < 0.1:
-                    target_not_reached = False
-
-                #rads
-                theta1_dot, theta2_dot = self.robot.joint_velocities(current_theta1, current_theta2, vx, vy)
-                new_theta1 = current_theta1 + np.degrees(theta1_dot * dt)
-                new_theta2 = current_theta2 + np.degrees(theta2_dot * dt)
-
-                self.slider1.set_val(new_theta1)
-                self.slider2.set_val(new_theta2)
-                plt.pause(dt)
+            for i in range(steps + 1):
+                frac = i / steps
+                t1 = t1_start + frac * (t1_target - t1_start)
+                t2 = t2_start + frac * (t2_target - t2_start)
+                self.slider1.set_val(t1)
+                self.slider2.set_val(t2)
+                plt.pause(pause / steps)
                 
-
-    
-
 robot1 = TwoLinkArm(2, 3)
 robot2 = TwoLinkArm(5, 1)
 
@@ -200,7 +193,7 @@ visual1 = ArmVisualiser(robot1)
 visual2 = ArmVisualiser(robot2)
 visual1.display()
 visual2.display()
-path = [(3, 4)]
+path = [(1,2), (4,1),(3,2), (-2, 1.5)]
 visual1.animate_path(path)
 plt.show()
 
