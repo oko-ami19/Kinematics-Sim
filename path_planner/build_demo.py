@@ -7,7 +7,7 @@ from visualiser3d import TraceVisualiser3D
 
 if __name__ == "__main__":
     arm = TwoLinkArm(5, 4)
-    stack = LayeredToolPath(ToolPath.circle((0, 3), 1.5, 4), 0.2, 5)
+    stack = LayeredToolPath(ToolPath.circle((0, 3), 1.5, 40), 0.2, 5)
 
     vis2d = ArmVisualiser(arm)
     vis3d = TraceVisualiser3D("Hollow cylinder")
